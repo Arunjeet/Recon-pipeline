@@ -2,7 +2,7 @@ STEP1: Create virtual environment inside project folder
 A> get the miniconda file path. Open anaconda terminal and run find conda. Get the conda executable file path
 B> Create a folder inside editor, open terminal and run & "C:\ProgramData\miniconda3\Scripts\conda.exe" create --prefix ./venv python=3.10
 C> Initiate the conda inside project folder & "C:\ProgramData\miniconda3\Scripts\conda.exe" init powershell
-D> Activate the venv conda activate ./venv
+D> Activate the venv: conda activate ./venv
 
 STEP2: Create a extraction.py for loading, cleaning. Use pandas/spark or whatever to make it easy.
 Create a requirements.txt file and execute using pip install -r requirements.txt (can use docker for whole process if required)
@@ -22,3 +22,4 @@ BEGIN;
 
 COMMIT;
 """)
+
