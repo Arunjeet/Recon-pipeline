@@ -24,7 +24,7 @@ def get_conn():
 """
 
 
-DATABASE_URL = "sqlite:///./mydb.sqlite"
+DATABASE_URL = "sqlite:///./reports.sqlite"
 
 # Create ONE engine and reuse it everywhere
 engine = create_engine(
