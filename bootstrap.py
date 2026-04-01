@@ -1,81 +1,49 @@
-#ENSURES DATA CHECKS BEFORE SCHEMA EXECUTION...
+#ENSURES DATA CHECKS BEFORE SCHEMA EXECUTION... STAGING TABLES ARE ALWAYS DELETED...
+
 # app/bootstrap.py
 from sqlalchemy import text
 from db_config import engine
 
-from schemas import TB_DDL
-from schemas import TB_STG
+from schemas import BANK_DDL
+from schemas import BANK_DDL_STG
+from schemas import BANK_DDL_PROCESSED_STG
+from schemas import BANK_UNREC
 
-from schemas import PNL_DDL
-from schemas import PNL_STG
+from schemas import CLIENT_DDL
+from schemas import CLIENT_DDL_STG
 
-from schemas import JOURNALS_DDL
-from schemas import JOURNALS_STG
-
-from schemas import MANUALJOURNALS_DDL
-from schemas import MANUALJOURNALS_STG
-
-
-from schemas import ACCOUNTS_DDL
-from schemas import ACCOUNTS_STG
-
-
-from schemas import MASTER_DDL
-
+from schemas import CLIENT_DDL_PROCESSED
+from schemas import CLIENT_DDL_PROCESSED_STG
 
 def ensure_schema():
     # engine.begin() gives you a transactional connection that auto-commits/rolls back
     with engine.begin() as conn:
-        
+        conn.execute(text("""DROP TABLE IF EXISTS bankraw"""))
+        conn.execute(text(BANK_DDL))
+        #conn.execute(text(UNIQUE_COLS_BANK))
 
-        #conn.execute(text("""DROP TABLE IF EXISTS master"""))
-        conn.execute(text(MASTER_DDL))
-        #----------------------------------------------------------------------------
-        #conn.execute(text("""DROP TABLE IF EXISTS tb_client"""))
-        conn.execute(text(TB_DDL))
-        
+        conn.execute(text("""DROP TABLE IF EXISTS bankrawstg"""))
+        conn.execute(text(BANK_DDL_STG))
 
-        conn.execute(text("""DROP TABLE IF EXISTS tb_client_stg"""))
-        conn.execute(text(TB_STG))
-        #-----------------------------------------------------------------------------
+        conn.execute(text("""DROP TABLE IF EXISTS bankprocessedstg"""))
+        conn.execute(text(BANK_DDL_PROCESSED_STG))
+        #conn.execute(text(UNIQUE_COLS_CLIENT))
 
-        #conn.execute(text("""DROP TABLE IF EXISTS pnl_client"""))
-        conn.execute(text(PNL_DDL))
-        
-
-        conn.execute(text("""DROP TABLE IF EXISTS pnl_client_stg"""))
-        conn.execute(text(PNL_STG))
-
-
-        #-----------------------------------------------------------------------------
-
-
-        #conn.execute(text("""DROP TABLE IF EXISTS journalsraw"""))
-        conn.execute(text(JOURNALS_DDL))
-        
-
-        conn.execute(text("""DROP TABLE IF EXISTS journalsrawstg"""))
-        conn.execute(text(JOURNALS_STG))
-
+        conn.execute(text("""DROP TABLE IF EXISTS bankunrec"""))
+        conn.execute(text(BANK_UNREC))
 
 
 
         #-----------------------------------------------------------------------------
 
-        #conn.execute(text("""DROP TABLE IF EXISTS manualjournalsraw"""))
-        conn.execute(text(MANUALJOURNALS_DDL))
-        
+        conn.execute(text("""DROP TABLE IF EXISTS clientraw"""))
+        conn.execute(text(CLIENT_DDL))
 
-        conn.execute(text("""DROP TABLE IF EXISTS manualjournalsstg"""))
-        conn.execute(text(MANUALJOURNALS_STG))
-        #------------------------------------------------------------------------------
+        conn.execute(text("""DROP TABLE IF EXISTS clientrawstg"""))
+        conn.execute(text(CLIENT_DDL_STG))
 
+        conn.execute(text("""DROP TABLE IF EXISTS clientprocessed"""))
+        conn.execute(text(CLIENT_DDL_PROCESSED))
 
-
-        #conn.execute(text("""DROP TABLE IF EXISTS accountsraw"""))
-        conn.execute(text(ACCOUNTS_DDL))
-        
-
-        conn.execute(text("""DROP TABLE IF EXISTS accountsstg"""))
-        conn.execute(text(ACCOUNTS_STG))
-        #------------------------------------------------------------------------------
+        conn.execute(text("""DROP TABLE IF EXISTS clientprocessedstg"""))
+        conn.execute(text(CLIENT_DDL_PROCESSED_STG))

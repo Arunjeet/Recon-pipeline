@@ -15,8 +15,8 @@ from models import validate_bank_df, validate_client_df
 
 # Parameterized INSERT (avoid including id; SQLite will autogenerate)
 INSERT_BANK = text("""
-INSERT INTO bankraw (date, description, amount)
-VALUES (:date, :description, :amount)
+INSERT INTO bankrawstg (date, description, amount, banktransactionid, direction, istransfer, isreconciled, bankaccountid, bankname, contactname, hasattachment)
+VALUES (:date, :description, :amount, :banktransactionid, :direction, :istransfer, :isreconciled, :bankaccountid, :bankname, :contactname, :hasattachment)
 """)
 
 # Optional: Upsert to prevent duplicates by (date, description, amount)
@@ -28,22 +28,15 @@ VALUES (:date, :description, :amount)
 #ON CONFLICT(date, description, amount) DO NOTHING;
 #""")
 
-
-
-
-# main transformation section, can use pandas sql...
-def load_bank_raw(path: str, sheet: str, cols: list[str]) -> int:
+def load_bank_raw(path: str) -> int:
     """
     1) Calls extraction.loading(path, sheet, cols) to get the raw cleaned df.
     2) Normalizes types/columns.
     3) Loads into SQLite using parameterized SQL in a single transaction.
     """
 
-    df = bankfunc(path, sheet, cols)
+    df = bankfunc(path)
     rows = validate_bank_df(df)
-
-    # Convert to list of dicts for executemany
-    #rows = df.to_dict(orient='records')
 
     #GETS UPDATED ONCE STARTS INSERTING...
     inserted = 0
@@ -51,9 +44,6 @@ def load_bank_raw(path: str, sheet: str, cols: list[str]) -> int:
     # Does use transaction...
     with SessionLocal.begin() as session:
         try:      
-            #cnt = session.execute(select(func.count()).select_from(text("bankraw"))).scalar_one()
-            #stmt = UPSERT_BANK if cnt > 0 else INSERT_BANK
-            # executemany in one statement
             stmt=INSERT_BANK
             session.execute(stmt, rows)
             inserted = len(rows)
@@ -66,20 +56,33 @@ def load_bank_raw(path: str, sheet: str, cols: list[str]) -> int:
             #AND r.ranking > 1;
             #""" )
 
-            session.execute(text("""DELETE FROM BANKRAW WHERE EXISTS 
-            (SELECT 1 FROM BANKRAW B WHERE BANKRAW.DATE=B.DATE AND BANKRAW.DESCRIPTION=B.DESCRIPTION AND BANKRAW.AMOUNT=B.AMOUNT AND BANKRAW.ID<B.ID)   
-            """ ))
+            session.execute(text("""
+            INSERT INTO BANKRAW(date, description, amount, banktransactionid, direction, istransfer, isreconciled, bankaccountid, bankname, contactname, hasattachment)
+            SELECT date, description, amount, banktransactionid, direction, istransfer, isreconciled, bankaccountid, bankname, contactname, hasattachment FROM BANKRAWSTG 
+            WHERE NOT EXISTS(
+            SELECT 1 FROM BANKRAW A 
+            WHERE A.DATE=BANKRAWSTG.DATE 
+            AND A.BANKNAME=BANKRAWSTG.BANKNAME 
+            AND A.DESCRIPTION=BANKRAWSTG.DESCRIPTION 
+            AND A.AMOUNT=BANKRAWSTG.AMOUNT
+            AND A.banktransactionid=BANKRAWSTG.banktransactionid);""" ))
+
             #Use staging table to maintain ids...
-            session.execute(text("""INSERT INTO BANKRAWSTG(date, description, amount) SELECT date, description, amount FROM BANKRAW;""" ))
+            session.execute(text("""
+            UPDATE BANKRAW AS c
+            SET
+            direction = s.direction, istransfer = s.istransfer, isreconciled = s.isreconciled, 
+            bankaccountid = s.bankaccountid, contactname = s.contactname, hasattachment = s.hasattachment
+            FROM BANKRAWSTG AS s
+            WHERE s.bankname = c.bankname 
+            AND s.date = c.date
+            AND s.description = c.description
+            AND s.amount = c.amount
+            AND s.banktransactionid=c.banktransactionid;""" ))
 
-            session.execute(text("""DELETE FROM BANKRAW""" ))
 
-            #Final insert...
-            session.execute(text("""INSERT INTO BANKRAW SELECT * FROM BANKRAWSTG""" ))
-
+            # Delete from staging table...
             session.execute(text("""DELETE FROM BANKRAWSTG""" ))
-
-
             session.commit()
             
         except SQLAlchemyError:
@@ -95,8 +98,8 @@ def load_bank_raw(path: str, sheet: str, cols: list[str]) -> int:
 
 
 INSERT_CLIENT = text("""
-INSERT INTO clientraw (date, description, amount, counterpart_coding, talos_name)
-VALUES (:date, :description, :amount, :counterpart_coding, :talos_name)
+INSERT INTO CLIENTRAWSTG (date, bankname, description, amount, counterpart_coding, talos_name)
+VALUES (:date, :bankname, :description, :amount, :counterpart_coding, :talos_name)
 """)
 
 # Optional: Upsert to prevent duplicates by (date, description, amount)
@@ -109,13 +112,13 @@ VALUES (:date, :description, :amount, :counterpart_coding, :talos_name)
 
 
 
-def load_client_raw(path: str, sheet: str, cols: list[str]) -> int:
+def load_client_raw(path, sheet=None, markers=None, lower_cols=True) -> int:
     """
     1) Calls extraction.loading(path, sheet, cols) to get the raw cleaned df.
     2) Normalizes types/columns.
     3) Loads into SQLite using parameterized SQL in a single transaction.
     """
-    df = clientfunc(path, sheet, cols)
+    df = clientfunc(path, sheet, markers)
     rows=validate_client_df(df)
 
 
@@ -132,18 +135,34 @@ def load_client_raw(path: str, sheet: str, cols: list[str]) -> int:
             session.execute(stmt, rows)
             inserted = len(rows)
             #Keeps the latest update with fast execution...
-            session.execute(text(""" DELETE FROM CLIENTRAW WHERE EXISTS 
-            (SELECT 1 FROM CLIENTRAW B WHERE CLIENTRAW.DATE=B.DATE AND CLIENTRAW.DESCRIPTION=B.DESCRIPTION AND CLIENTRAW.AMOUNT=B.AMOUNT AND CLIENTRAW.ID<B.ID)   
-            """ ))
+            #session.execute(text(""" DELETE FROM CLIENTRAW WHERE EXISTS 
+            #(SELECT 1 FROM CLIENTRAW B WHERE CLIENTRAW.DATE=B.DATE AND CLIENTRAW.DESCRIPTION=B.DESCRIPTION AND CLIENTRAW.AMOUNT=B.AMOUNT AND CLIENTRAW.ID<B.ID)   
+            #""" ))
+            session.execute(text("""INSERT INTO CLIENTRAW (date, bankname, description, amount, counterpart_coding, talos_name)
+            SELECT date, bankname, description, amount, counterpart_coding, talos_name FROM CLIENTRAWSTG 
+            WHERE NOT EXISTS(
+            SELECT 1 FROM CLIENTRAW A 
+            WHERE A.DATE=CLIENTRAWSTG.DATE 
+            AND A.BANKNAME=CLIENTRAWSTG.BANKNAME 
+            AND A.DESCRIPTION=CLIENTRAWSTG.DESCRIPTION 
+            AND A.AMOUNT=CLIENTRAWSTG.AMOUNT)"""))
 
-            #Use staging table to maintain ids...
-            session.execute(text("""INSERT INTO CLIENTRAWSTG(date, description, amount, counterpart_coding, talos_name) 
-            SELECT date, description, amount, counterpart_coding, talos_name FROM CLIENTRAW;""" ))
+            #UPDATING EXISTING COLUMNS...
 
-            session.execute(text("""DELETE FROM CLIENTRAW""" ))
+            session.execute(text("""
+            UPDATE clientraw AS c
+            SET
+            bankname=s.bankname,
+            counterpart_coding = s.counterpart_coding,
+            talos_name = s.talos_name
+            FROM clientrawstg AS s
+            WHERE s.bankname = c.bankname 
+            AND s.date = c.date
+            AND s.description = c.description
+            AND s.amount = c.amount
+            """))
 
             #Final insert...
-            session.execute(text("""INSERT INTO CLIENTRAW SELECT * FROM CLIENTRAWSTG""" ))
             session.execute(text("""DELETE FROM CLIENTRAWSTG""" ))
 
             session.commit()
