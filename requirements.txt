@@ -5,3 +5,7 @@ psycopg2
 python-dotenv
 pandasql
 pydantic
+requests
+flask
+gspread
+gspread_dataframe
