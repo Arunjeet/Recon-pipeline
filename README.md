@@ -29,8 +29,8 @@ Ingests raw client bank and transaction files, validates every row through Pydan
 - **Pydantic validation models** (`BankRawModel`, `ClientRawModel`) — row-level type enforcement, date coercion, comma-tolerant float parsing, boolean normalisation, `AliasChoices` for flexible field mapping
 - **Same staging/upsert pattern** as Step 1 — consistent, predictable, idempotent writes
 - **`bankunrec` table** — persistent ledger of unreconciled bank transactions. Auto-populates on new unreconciled items, auto-clears when the bank system marks them reconciled on a subsequent run
-- **Entity extraction** from free-text `talos_name` — detects BVI / DE / LP markers, strips suffixes, produces clean client names
-- **Internal encoding** — maps entity codes to account encoding strings (`bvi-1113`, `usa-1112`, `1115/1116`)
+- **Entity extraction** from free-text `talos_name` — detects markers, strips suffixes, produces clean client names
+- **Internal encoding** — maps entity codes to account encoding strings
 - **SQL transformation layer** — `clienttransform.py` enriches raw records into `clientprocessed` with coding, entity, keyword, and encoding columns
 
 ---
